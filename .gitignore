@@ -1,0 +1,10 @@
+node_modules/
+.wrangler/
+.dev.vars
+dist/
+*.log
+
+# Real config; never commit. Copy the .example files instead.
+agent/config.json
+worker/wrangler.toml
+.env

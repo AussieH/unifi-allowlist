@@ -1,0 +1,19 @@
+{
+  "_comment": "Copy to /etc/unifi-allowlist/admin-ui.json (mode 640). Holds ADMIN_KEY; never commit it. Set the password with set-password.js; it fills passwordHash and sessionSecret.",
+
+  "_listen": "Interface to bind. 0.0.0.0 = every interface on the machine; or a single LAN or Tailscale address.",
+  "listen": "0.0.0.0",
+  "port": 8080,
+
+  "workerUrl": "https://allow.example.com",
+  "adminKey": "PASTE_THE_ADMIN_KEY_YOU_SET_WITH_WRANGLER_SECRET_PUT",
+
+  "_behindTls": "true when Caddy, nginx or Tailscale Serve terminates HTTPS in front of this, so the session cookie gets the Secure flag.",
+  "behindTls": false,
+
+  "sessionHours": 12,
+  "siteName": "Allow-list admin",
+
+  "sessionSecret": "PASTE_OR_LET_set-password.js_GENERATE",
+  "passwordHash": ""
+}

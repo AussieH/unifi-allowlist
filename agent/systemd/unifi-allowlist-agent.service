@@ -1,0 +1,36 @@
+[Unit]
+Description=unifi-allowlist agent (syncs verified player IPs into UniFi)
+Documentation=https://github.com/AussieH/unifi-allowlist
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=unifi-allowlist
+Group=unifi-allowlist
+ExecStart=/usr/bin/node /opt/unifi-allowlist/unifi-allowlist-agent.js --config /etc/unifi-allowlist/config.json
+Restart=always
+RestartSec=15
+
+# The config holds a UniFi password; keep the unit boxed in.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+# No MemoryDenyWriteExecute: Node's JIT needs writable+executable pages and dies with SIGTRAP without them.
+SystemCallArchitectures=native
+ReadOnlyPaths=/etc/unifi-allowlist
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=unifi-allowlist
+
+[Install]
+WantedBy=multi-user.target

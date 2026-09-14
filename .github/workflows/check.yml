@@ -1,0 +1,28 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check agent and admin UI syntax
+        run: |
+          node --check agent/unifi-allowlist-agent.js
+          node --check admin-ui/server.js
+          node --check admin-ui/set-password.js
+      - name: Check worker modules
+        run: |
+          for f in worker/src/*.js worker/src/auth/*.js; do
+            node --input-type=module --check < "$f" || exit 1
+          done
+      - name: Check shell scripts
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck agent/install.sh admin-ui/install.sh scripts/admin.sh

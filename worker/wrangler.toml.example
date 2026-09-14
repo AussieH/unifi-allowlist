@@ -1,0 +1,66 @@
+# Copy to wrangler.toml and fill in the placeholders:
+#   cp wrangler.toml.example wrangler.toml
+#
+# wrangler.toml is gitignored, because it ends up holding your account-specific IDs.
+
+name = "unifi-allowlist"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+workers_dev = false
+
+# Create with: wrangler d1 create unifi-allowlist
+[[d1_databases]]
+binding = "DB"
+database_name = "unifi-allowlist"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+[vars]
+# Shown in the page title and footer.
+SITE_NAME = "Game Servers"
+
+# Entries not refreshed within this many days stop being served to the agent,
+# which keeps dead addresses from piling up in the firewall group.
+TTL_DAYS = "30"
+
+# Only set true if you also maintain an IPv6 address-group in UniFi (see docs/IPV6.md).
+ALLOW_IPV6 = "false"
+
+# Only serve the pages and the admin API to these countries (ISO 3166-1 two-letter codes,
+# by Cloudflare's geolocation). Empty = everyone. /healthz and the agent feed are never blocked.
+ALLOWED_COUNTRIES = ""
+
+# Which sign-in methods are live. Comma-separated: token, discord, or both.
+#   token   = per-player secret URLs you hand out (/u/name/xxxxx)
+#   discord = "Sign in with Discord", gated on membership of your server
+AUTH_PROVIDERS = "token"
+
+# --- Discord provider (only needed when AUTH_PROVIDERS includes "discord") ---
+# From https://discord.com/developers/applications → your app → OAuth2.
+# DISCORD_CLIENT_ID = "000000000000000000"
+#
+# Restrict sign-in to members of one guild. Strongly recommended: without it,
+# any Discord account in the world can claim a slot.
+# DISCORD_GUILD_ID = "000000000000000000"
+#
+# Optional extra gate: require one of these role IDs within that guild.
+# DISCORD_ROLE_IDS = "000000000000000000,111111111111111111"
+#
+# Defaults to <your worker origin>/auth/discord/callback. Override only if you
+# front the Worker with something else.
+# DISCORD_REDIRECT_URI = "https://allow.example.com/auth/discord/callback"
+
+# How long a Discord sign-in lasts before they have to sign in again.
+SESSION_TTL_SECONDS = "86400"
+
+# --- Secrets: set with `wrangler secret put`, never in this file ---
+#   wrangler secret put ADMIN_KEY              # protects /admin/*
+#   wrangler secret put AGENT_KEY              # the LAN agent's polling credential
+#   wrangler secret put SESSION_SECRET         # random; signs Discord session cookies
+#   wrangler secret put DISCORD_CLIENT_SECRET  # only for the discord provider
+#
+# Generate keys with:  openssl rand -base64 32
+
+# Bind a hostname so player links stay stable and memorable.
+# [[routes]]
+# pattern = "allow.example.com"
+# custom_domain = true

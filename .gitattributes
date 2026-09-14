@@ -1,0 +1,12 @@
+# Scripts and units in this repo run on Linux. Never let a Windows checkout
+# rewrite them to CRLF: bash fails on a CR in the shebang, and so does systemd.
+* text=auto eol=lf
+
+*.sh        text eol=lf
+*.js        text eol=lf
+*.service   text eol=lf
+*.sql       text eol=lf
+*.toml      text eol=lf
+*.json      text eol=lf
+*.yml       text eol=lf
+*.md        text eol=lf

@@ -1,0 +1,36 @@
+[Unit]
+Description=unifi-allowlist admin UI (LAN web page for managing players)
+Documentation=https://github.com/AussieH/unifi-allowlist
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=unifi-allowlist
+Group=unifi-allowlist
+ExecStart=/usr/bin/node /opt/unifi-allowlist-ui/server.js --config /etc/unifi-allowlist/admin-ui.json
+Restart=always
+RestartSec=10
+
+# The config holds ADMIN_KEY; keep the unit boxed in.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+# No MemoryDenyWriteExecute: Node's JIT needs writable+executable pages.
+SystemCallArchitectures=native
+ReadOnlyPaths=/etc/unifi-allowlist
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=unifi-allowlist-ui
+
+[Install]
+WantedBy=multi-user.target

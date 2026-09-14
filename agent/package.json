@@ -1,0 +1,13 @@
+{
+  "name": "unifi-allowlist-agent",
+  "version": "0.1.0",
+  "description": "LAN-side agent that syncs verified player IPs into a UniFi firewall group",
+  "license": "MIT",
+  "main": "unifi-allowlist-agent.js",
+  "bin": { "unifi-allowlist-agent": "./unifi-allowlist-agent.js" },
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node unifi-allowlist-agent.js",
+    "check": "node --check unifi-allowlist-agent.js"
+  }
+}

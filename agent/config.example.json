@@ -1,0 +1,42 @@
+{
+  "_comment": "Copy to /etc/unifi-allowlist/config.json and chmod 600. Holds a UniFi password; never commit it.",
+
+  "workerUrl": "https://allow.example.com",
+  "agentKey": "PASTE_THE_AGENT_KEY_YOU_SET_WITH_WRANGLER_SECRET_PUT",
+  "pollSeconds": 60,
+
+  "_staticAllow": "Addresses always kept in the group regardless of the Worker: your own static IP, a VPS, a monitoring host. CIDR is fine.",
+  "staticAllow": [],
+
+  "_minEntries": "Refuse to write a member list shorter than this. Guards against a bad upstream response emptying the group and locking everyone out. Set to 0 only if an empty list is actually what you want.",
+  "minEntries": 1,
+
+  "dryRun": false,
+
+  "_discordWebhook": "Optional. A Discord channel webhook URL: one message per sync that adds or removes addresses, and one when syncing keeps failing. Treat the URL as a secret.",
+  "discordWebhook": null,
+  "_alerts": "Which alerts to send. mention is prepended to failure alerts, e.g. <@123456789012345678> for a user or <@&role id> for a role.",
+  "alerts": { "added": true, "removed": true, "failures": true, "failureThreshold": 5, "mention": "" },
+
+  "unifi": {
+    "host": "https://192.168.1.1",
+
+    "_site": "Site 'name' from the controller URL, not its display name. Usually 'default'.",
+    "site": "default",
+
+    "_credentials": "Use a dedicated local-only admin with no MFA. Not your Ubiquiti SSO account.",
+    "username": "allowlist-agent",
+    "password": "CHANGE_ME",
+
+    "_unifiOs": "true for UDM/UDR/UDM-Pro/Cloud Key gen2+ (paths under /proxy/network). false for a self-hosted controller.",
+    "unifiOs": true,
+
+    "_insecureTls": "Controllers ship self-signed certs, so this defaults to true. Prefer pinning tlsFingerprint256 instead of leaving this unchecked.",
+    "insecureTls": true,
+    "tlsFingerprint256": null,
+
+    "_groupIds": "Run the agent with --list-groups to find these. groupIdV6 is only needed if you enabled ALLOW_IPV6 on the Worker.",
+    "groupIdV4": "REPLACE_WITH_FIREWALL_GROUP_ID",
+    "groupIdV6": null
+  }
+}
