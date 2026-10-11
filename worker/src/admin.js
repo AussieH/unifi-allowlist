@@ -6,6 +6,7 @@
  *   POST   /admin/players/:slug/rotate       → new link, old one dies
  *   POST   /admin/players/:slug/enable
  *   POST   /admin/players/:slug/disable
+ *   POST   /admin/players/:slug/ip           {ip}  → set the player's IPv4 by hand (a public IPv4 only)
  *   DELETE /admin/players/:slug
  *   GET    /admin/audit?limit=100
  *
@@ -19,10 +20,11 @@ import {
   getPlayer,
   listPlayers,
   recentAudit,
+  recordIp,
   setEnabled,
   setTokenHash,
 } from './db.js';
-import { authorised, json, normaliseSlug, randomToken, readJson, sha256hex } from './util.js';
+import { authorised, json, normaliseSlug, publicIpv4, randomToken, readJson, sha256hex } from './util.js';
 
 export async function handleAdmin(request, env, seg) {
   if (!authorised(request, env.ADMIN_KEY)) return json({ error: 'unauthorized' }, 401);
@@ -42,6 +44,10 @@ export async function handleAdmin(request, env, seg) {
     if (!res.meta || res.meta.changes === 0) return json({ error: 'not_found' }, 404);
     await audit(env, { slug, event: 'deleted', via: 'admin' });
     return json({ slug, deleted: true });
+  }
+
+  if (seg[0] === 'players' && seg.length === 3 && seg[2] === 'ip' && method === 'POST') {
+    return setIp(request, env, normaliseSlug(seg[1]));
   }
 
   if (seg[0] === 'players' && seg.length === 3 && method === 'POST') {
@@ -99,4 +105,24 @@ async function playerAction(env, origin, slug, action) {
   }
 
   return json({ error: 'unknown_action', detail: 'expected rotate, enable or disable' }, 400);
+}
+
+/**
+ * Set a player's IPv4 by hand. For players whose browser reaches the Worker over IPv6, so a claim can only ever see
+ * their v6 address (docs/IPV6.md) while their game connects over v4. Stored exactly like a claim -- same column, and
+ * ip4_seen = now, so the usual TTL_DAYS expiry applies -- and audited as `ip_set` via admin. A later claim from IPv4
+ * overwrites it as normal; a claim from IPv6 is still refused and leaves it alone.
+ */
+async function setIp(request, env, slug) {
+  const player = await getPlayer(env, slug);
+  if (!player) return json({ error: 'not_found' }, 404);
+  const body = await readJson(request);
+  const ip = publicIpv4(body.ip);
+  if (!ip) {
+    return json({ error: 'bad_ip', detail: 'expected a public IPv4 address (private, CGNAT, loopback and reserved ranges are refused)' }, 400);
+  }
+  const oldIp = player.ip4;
+  await recordIp(env, slug, ip, 4);
+  await audit(env, { slug, event: 'ip_set', oldIp, newIp: ip, via: 'admin' });
+  return json({ slug, ip4: ip });
 }

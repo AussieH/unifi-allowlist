@@ -12,6 +12,7 @@
 #   ./admin.sh rotate steve
 #   ./admin.sh disable steve
 #   ./admin.sh enable steve
+#   ./admin.sh setip steve 203.0.113.7   # set the IPv4 by hand (player stuck on IPv6)
 #   ./admin.sh delete steve
 #   ./admin.sh audit 50
 
@@ -62,6 +63,13 @@ case "$cmd" in
   enable|disable)
     slug="${1:?usage: admin.sh ${cmd} <slug>}"
     api POST "/admin/players/${slug}/${cmd}" | pretty
+    ;;
+
+  setip)
+    slug="${1:?usage: admin.sh setip <slug> <public IPv4>}"
+    ip="${2:?usage: admin.sh setip <slug> <public IPv4>}"
+    [[ "$ip" =~ ^[0-9.]{7,15}$ ]] || { echo "Not an IPv4 address: ${ip}" >&2; exit 1; }
+    api POST "/admin/players/${slug}/ip" "$(printf '{"ip":"%s"}' "$ip")" | pretty
     ;;
 
   delete)

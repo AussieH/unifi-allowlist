@@ -30,6 +30,22 @@ Worker on a separate domain instead.
 If the toggle is not available on your plan, the fallback is asking affected players to
 disable IPv6 on the device or use another network. In practice it is a small minority.
 
+## Setting it by hand
+
+For the occasional player who can't get to the page over IPv4, an admin can put their IPv4
+in directly: **Set IPv4** on their row in the admin UI, or
+
+```
+./scripts/admin.sh setip steve 203.0.113.7
+```
+
+(`POST /admin/players/:slug/ip {"ip": "..."}`). Ask them for their *IPv4*, for example from
+`ipv4.icanhazip.com`. Only a public IPv4 is accepted: private, CGNAT, loopback and reserved
+ranges are refused. It is stored exactly like a claim, so it counts as fresh and expires after
+`TTL_DAYS` unless refreshed, and it is audited as `ip_set` with the old and new address. A
+later claim over IPv4 replaces it as usual; a claim over IPv6 is still refused and leaves it
+alone.
+
 ## Supporting IPv6 for real
 
 If your game servers accept IPv6 and you want both families allow-listed:

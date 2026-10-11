@@ -207,6 +207,7 @@ function playersPage(session, players, flash) {
     <td class="num muted" title="${esc(when(p.ip4_seen))}">${esc(ago(p.ip4_seen))}</td>
     <td>${p.enabled ? '<span class="pill on">enabled</span>' : '<span class="pill off">disabled</span>'}${p.has_link ? '' : ' <span class="muted">no link</span>'}${p.discord_id ? ' <span class="muted">discord</span>' : ''}</td>
     <td class="actions">
+      ${setIpForm(session, p.slug)}
       ${act(session, p.slug, 'rotate', 'New link', 'ghost')}
       ${p.enabled ? act(session, p.slug, 'disable', 'Disable', 'ghost') : act(session, p.slug, 'enable', 'Enable', 'ghost')}
       ${act(session, p.slug, 'delete', 'Delete', 'danger', true)}
@@ -219,9 +220,16 @@ function playersPage(session, players, flash) {
         <div><label for="name">Display name</label><input id="name" type="text" name="name" maxlength="64" placeholder="Steve"></div>
         <div><label for="note">Note (optional)</label><input id="note" type="text" name="note" maxlength="200" placeholder="Discord: steve#1234"></div>
         <div><button type="submit">Create link</button></div></form>
-      <p class="muted" style="margin:.75rem 0 0">The link is shown once, on the next page. Send it privately; whoever holds it can claim that slot.</p></div>
+      <p class="muted" style="margin:.75rem 0 0">The link is shown once, on the next page. Send it privately; whoever holds it can claim that slot.</p>
+      <p class="muted" style="margin:.5rem 0 0"><strong>Set IPv4</strong> on a row puts that address in by hand, for a player whose browser only reaches the claim page over IPv6. Ask them for their <em>IPv4</em> (e.g. from ipv4.icanhazip.com). It counts as a fresh claim, so it expires after the usual 30 days unless they or you refresh it.</p></div>
     <div class="card"><table><thead><tr><th>Player</th><th>Allowed IPv4</th><th>Refreshed</th><th>State</th><th>Actions</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="5" class="muted">No players yet.</td></tr>'}</tbody></table></div>`, { session, tab: 'players' });
+}
+
+function setIpForm(session, slug) {
+  return `<form method="POST" action="/players/${encodeURIComponent(slug)}/ip"><input type="hidden" name="csrf" value="${esc(session.csrf)}">
+    <input type="text" name="ip" inputmode="decimal" pattern="[0-9.]{7,15}" maxlength="15" placeholder="IPv4" aria-label="IPv4 for ${esc(slug)}" required style="width:8.5rem;display:inline-block;padding:.2rem .4rem">
+    <button class="ghost" type="submit">Set IPv4</button></form>`;
 }
 
 function act(session, slug, action, label, cls, confirm = false) {
@@ -306,6 +314,20 @@ async function handle(req, res) {
     if (path === '/players' && req.method === 'POST') {
       const r = await api('POST', '/admin/players', { slug: body.slug, name: body.name || body.slug, note: body.note || undefined });
       return send(res, 201, linkPage(session, 'Player created', r.slug, r.url, body.note));
+    }
+    const ipm = /^\/players\/([a-z0-9-]{1,32})\/ip$/.exec(path);
+    if (ipm && req.method === 'POST') {
+      const slug = ipm[1];
+      const ip = String(body.ip || '').trim();
+      try {
+        const r = await api('POST', `/admin/players/${slug}/ip`, { ip });
+        return redirect(res, '/?ok=' + encodeURIComponent(`${slug} is now allowed from ${r.ip4}. The agent picks it up within about 2 minutes.`));
+      } catch (err) {
+        const why = /bad_ip/.test(err.message) ? `"${ip}" isn't a public IPv4 address.`
+          : /answered 404|unknown.action/.test(err.message) ? 'the Worker has no /ip route yet. Deploy the Worker from this release (npx wrangler deploy).'
+          : err.message;
+        return redirect(res, '/?err=' + encodeURIComponent(`Couldn't set ${slug}'s IPv4: ${why}`));
+      }
     }
     const m = /^\/players\/([a-z0-9-]{1,32})\/(rotate|enable|disable|delete)$/.exec(path);
     if (m && req.method === 'POST') {

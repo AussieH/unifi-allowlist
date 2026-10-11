@@ -1,7 +1,9 @@
 # Admin UI
 
 A small web page for the things `scripts/admin.sh` does: list players, add one (and see the
-one-time link), rotate a link, enable, disable, delete, and read the audit log.
+one-time link), rotate a link, enable, disable, delete, **set a player's IPv4 by hand** (for a
+player whose browser only reaches the claim page over IPv6, see [IPV6.md](IPV6.md#setting-it-by-hand)),
+and read the audit log.
 
 It runs on your LAN (the agent's container is a natural home) and calls the Worker's `/admin`
 API with `ADMIN_KEY`. The key stays in a root-owned config file on that machine; the browser
@@ -67,6 +69,6 @@ out, change `sessionSecret` and restart.
 
 ## What it cannot do
 
-It does not set players' addresses. Nothing can, other than the player pressing the button from
-that address. It does not touch UniFi either; the agent does that from the Worker's list, as
-before.
+It cannot set an IPv6 address or a private, CGNAT or reserved one: **Set IPv4** takes a public
+IPv4 only, and otherwise a player's address comes from them pressing the button from it. It does
+not touch UniFi either; the agent does that from the Worker's list, as before.

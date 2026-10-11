@@ -4,6 +4,30 @@ export const nowSec = () => Math.floor(Date.now() / 1000);
 
 export const ipFamily = (ip) => (String(ip).includes(':') ? 6 : 4);
 
+/**
+ * A public, unicast IPv4 address in plain dotted-quad form, or null. Used for admin overrides, where the address is
+ * typed by a person: anything private, loopback, link-local, CGNAT, multicast or reserved could never be the source
+ * address a player's game connects from, so it is refused rather than stored.
+ */
+export function publicIpv4(s) {
+  const t = String(s == null ? '' : s).trim();
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(t);
+  if (!m) return null;
+  const o = m.slice(1).map(Number);
+  if (o.some((n, i) => n > 255 || (m[i + 1].length > 1 && m[i + 1][0] === '0'))) return null;
+  const [a, b] = o;
+  if (a === 0 || a === 10 || a === 127 || a >= 224) return null;          // this-net, private, loopback, multicast/reserved
+  if (a === 100 && b >= 64 && b <= 127) return null;                       // CGNAT 100.64/10
+  if (a === 169 && b === 254) return null;                                 // link-local
+  if (a === 172 && b >= 16 && b <= 31) return null;                        // private
+  if (a === 192 && b === 168) return null;                                 // private
+  if (a === 192 && b === 0 && o[2] === 2) return null;                     // TEST-NET-1
+  if (a === 198 && (b === 18 || b === 19)) return null;                    // benchmarking
+  if (a === 198 && b === 51 && o[2] === 100) return null;                  // TEST-NET-2
+  if (a === 203 && b === 0 && o[2] === 113) return null;                   // TEST-NET-3
+  return o.join('.');
+}
+
 export function clientIp(request) {
   return (
     request.headers.get('cf-connecting-ip') ||
