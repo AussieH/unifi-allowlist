@@ -305,20 +305,27 @@ function validFor(family, addr) {
   return V6.test(s) && s.includes(':');
 }
 
+/** Records who an address belongs to, once per name (several players can share an address). */
+function addWho(who, ip, name) {
+  if (!name) return;
+  const list = who.get(ip) || [];
+  if (!list.includes(name)) who.set(ip, [...list, name]);
+}
+
 function buildDesired(entries, staticAllow, family, who = new Map()) {
   const out = new Set();
   for (const e of entries || []) {
     if (validFor(family, e.ip)) {
       const ip = String(e.ip).trim();
       out.add(ip);
-      who.set(ip, [...(who.get(ip) || []), e.slug].filter(Boolean));
+      addWho(who, ip, e.slug);
     } else warn(`skipping malformed address from Worker: ${e.slug}=${e.ip}`);
   }
   for (const s of staticAllow || []) {
     if (validFor(family, s)) {
       const ip = String(s).trim();
       out.add(ip);
-      who.set(ip, [...(who.get(ip) || []), 'static']);
+      addWho(who, ip, 'static');
     }
   }
   return [...out].sort();
@@ -457,10 +464,13 @@ async function syncOnce(cfg) {
 
   const staticV4 = cfg.staticAllow.filter((s) => validFor(4, s));
   const staticV6 = cfg.staticAllow.filter((s) => validFor(6, s));
-  const who = new Map(); // ip -> player slugs, for the alerts; removed addresses keep the last name we saw
-  for (const [ip, slugs] of lastWho) who.set(ip, slugs);
+  // ip -> player names for the alerts, built fresh every sync. Seeding it from the previous sync and then
+  // appending made each name repeat once per poll. Addresses that dropped out keep the names last seen,
+  // so a removal can still say whose it was.
+  const who = new Map();
   const desired4 = buildDesired(state.v4, staticV4, 4, who);
   const desired6 = buildDesired(state.v6, staticV6, 6, who);
+  for (const [ip, slugs] of lastWho) if (!who.has(ip)) who.set(ip, slugs);
 
   if (cfg.nftables) {
     const c4 = await syncNftSet(cfg, cfg.nftables.setV4, desired4, 'IPv4');

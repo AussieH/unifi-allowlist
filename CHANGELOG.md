@@ -11,6 +11,9 @@
   ruleset reload is refilled on the next poll. Unit: `agent/systemd/unifi-allowlist-agent-nftables.service`.
 - **`EDGE_AGENT_KEY`**: a second agent key whose feed carries addresses only, no player names,
   for agents on hosts you'd rather not trust with the roster.
+- **Fix: Discord alerts repeated the player's name once per poll** (e.g. "alice, alice, alice, …"
+  hundreds of times). The agent now builds the address-to-name map fresh on every sync and lists
+  each name once; removed addresses still show the name they had.
 
 ## 0.1.0
 
