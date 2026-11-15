@@ -1,0 +1,27 @@
+[Unit]
+Description=unifi-allowlist IPv4 probe
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=unifi-allowlist
+Group=unifi-allowlist
+ExecStart=/usr/bin/node /opt/unifi-allowlist/probe/unifi-allowlist-probe.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

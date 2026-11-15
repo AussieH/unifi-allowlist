@@ -1,0 +1,16 @@
+# IPv4 probe. The hostname needs an A record ONLY (no AAAA), DNS-only / not proxied,
+# pointing at this host, which itself should have no public IPv6.
+ip4.example.com {
+	# Only these two paths exist; everything else is a 404 from Caddy itself.
+	@probe path /v4 /healthz
+	handle @probe {
+		reverse_proxy 127.0.0.1:8089 {
+			# The real TCP peer. Overwrites anything the client sent under this name.
+			header_up X-Allowlist-Peer {remote_host}
+		}
+	}
+	handle {
+		respond 404
+	}
+	header -Server
+}

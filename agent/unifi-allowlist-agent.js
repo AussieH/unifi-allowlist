@@ -16,6 +16,7 @@
 
 'use strict';
 
+const { execFile } = require('node:child_process');
 const fs = require('node:fs');
 const https = require('node:https');
 const path = require('node:path');
@@ -47,15 +48,39 @@ function loadConfig(file) {
     throw new Error(`config at ${file} is not valid JSON: ${err.message}`);
   }
 
+  // Two targets: a UniFi firewall group (default), or local nftables sets (an edge host / VPS).
+  const nftMode = !!cfg.nftables;
   const missing = [];
   if (!cfg.workerUrl) missing.push('workerUrl');
   if (!cfg.agentKey) missing.push('agentKey');
-  if (!cfg.unifi || !cfg.unifi.host) missing.push('unifi.host');
-  if (!cfg.unifi || !cfg.unifi.username) missing.push('unifi.username');
-  if (!cfg.unifi || !cfg.unifi.password) missing.push('unifi.password');
+  if (nftMode) {
+    if (!cfg.nftables.table) missing.push('nftables.table');
+    if (!cfg.nftables.setV4 && !cfg.nftables.setV6) missing.push('nftables.setV4');
+  } else {
+    if (!cfg.unifi || !cfg.unifi.host) missing.push('unifi.host');
+    if (!cfg.unifi || !cfg.unifi.username) missing.push('unifi.username');
+    if (!cfg.unifi || !cfg.unifi.password) missing.push('unifi.password');
+  }
   if (missing.length) throw new Error(`config is missing: ${missing.join(', ')}`);
 
+  const NFT_NAME = /^[A-Za-z0-9_]{1,64}$/;
+  if (nftMode) {
+    const n = cfg.nftables;
+    for (const [k, v] of [['family', n.family || 'inet'], ['table', n.table], ['setV4', n.setV4], ['setV6', n.setV6]]) {
+      if (v != null && !NFT_NAME.test(String(v))) throw new Error(`nftables.${k} must be letters, digits or _`);
+    }
+  }
+
   return {
+    nftables: nftMode
+      ? {
+          family: cfg.nftables.family || 'inet',
+          table: cfg.nftables.table,
+          setV4: cfg.nftables.setV4 || null,
+          setV6: cfg.nftables.setV6 || null,
+          nft: cfg.nftables.nftPath || '/usr/sbin/nft',
+        }
+      : null,
     workerUrl: String(cfg.workerUrl).replace(/\/+$/, ''),
     agentKey: cfg.agentKey,
     pollSeconds: Math.max(15, Number(cfg.pollSeconds) || 60),
@@ -73,7 +98,7 @@ function loadConfig(file) {
       failureThreshold: Math.max(1, Number(cfg.alerts && cfg.alerts.failureThreshold) || 5),
       mention: cfg.alerts && typeof cfg.alerts.mention === 'string' ? cfg.alerts.mention : '',
     },
-    unifi: {
+    unifi: nftMode ? {} : {
       host: String(cfg.unifi.host).replace(/\/+$/, ''),
       site: cfg.unifi.site || 'default',
       username: cfg.unifi.username,
@@ -336,6 +361,63 @@ async function syncGroup(client, groupId, desired, label, cfg) {
   return { added, removed, groupName: group.name };
 }
 
+/* --------------------------------------------------------------- nftables */
+
+function runNft(cfg, args, input) {
+  return new Promise((resolve, reject) => {
+    const child = execFile(cfg.nftables.nft, args, { timeout: 15000 }, (err, stdout, stderr) => {
+      if (err) reject(new Error(`nft ${args.join(' ')}: ${(stderr || err.message).trim()}`));
+      else resolve(stdout);
+    });
+    if (input != null) child.stdin.end(input);
+  });
+}
+
+/** Current members of a plain (non-interval) set; timeout elements come back as objects. */
+async function nftMembers(cfg, set) {
+  const n = cfg.nftables;
+  const out = JSON.parse(await runNft(cfg, ['-j', 'list', 'set', n.family, n.table, set]));
+  const setObj = (out.nftables || []).find((o) => o.set);
+  const elems = (setObj && setObj.set.elem) || [];
+  return elems
+    .map((e) => (typeof e === 'string' ? e : e && e.elem ? e.elem.val : null))
+    .filter((v) => typeof v === 'string')
+    .sort();
+}
+
+/**
+ * Replaces a set's contents in one nft transaction (flush + add), so there is never a
+ * moment with the set half-written. Re-run every poll, it also refills a set that a
+ * reboot or a `nft -f` reload emptied.
+ */
+async function syncNftSet(cfg, set, desired, label) {
+  if (!set) return null;
+  const plain = desired.filter((ip) => !ip.includes('/'));
+  if (plain.length !== desired.length) warn(`${label}: nftables set ${set} takes single addresses; skipping CIDR entries`);
+
+  if (plain.length < cfg.minEntries) {
+    warn(`${label}: refusing to write ${plain.length} entries (minEntries=${cfg.minEntries}). Leaving set ${set} as-is.`);
+    return null;
+  }
+
+  const current = await nftMembers(cfg, set);
+  if (sameSet(current, plain)) return null;
+
+  const added = plain.filter((x) => !current.includes(x));
+  const removed = current.filter((x) => !plain.includes(x));
+  log(`${label}: ${current.length} → ${plain.length} members` +
+      (added.length ? ` (+${added.join(', ')})` : '') +
+      (removed.length ? ` (-${removed.join(', ')})` : ''));
+  if (cfg.dryRun) { log(`${label}: dry run, not writing`); return null; }
+
+  const n = cfg.nftables;
+  let script = `flush set ${n.family} ${n.table} ${set}\n`;
+  if (plain.length) script += `add element ${n.family} ${n.table} ${set} { ${plain.join(', ')} }\n`;
+  await runNft(cfg, ['-f', '-'], script);
+  log(`${label}: updated nftables set ${set}`);
+  return { added, removed, groupName: `nftables ${n.table}/${set}` };
+}
+
 /* --------------------------------------------------------------- alerts */
 
 /** Posts to the Discord webhook. Never throws; a post that fails is logged and dropped. */
@@ -379,6 +461,17 @@ async function syncOnce(cfg) {
   for (const [ip, slugs] of lastWho) who.set(ip, slugs);
   const desired4 = buildDesired(state.v4, staticV4, 4, who);
   const desired6 = buildDesired(state.v6, staticV6, 6, who);
+
+  if (cfg.nftables) {
+    const c4 = await syncNftSet(cfg, cfg.nftables.setV4, desired4, 'IPv4');
+    if (c4) { const m = changeMessage('IPv4', c4, who, cfg); if (m) await discord(cfg, m); }
+    if (cfg.nftables.setV6 && state.allow_ipv6) {
+      const c6 = await syncNftSet(cfg, cfg.nftables.setV6, desired6, 'IPv6');
+      if (c6) { const m = changeMessage('IPv6', c6, who, cfg); if (m) await discord(cfg, m); }
+    }
+    lastWho = who;
+    return;
+  }
 
   const client = new UnifiClient(cfg.unifi);
   await client.login();

@@ -1,0 +1,12 @@
+{
+  "workerUrl": "https://allow.example.com",
+  "agentKey": "the EDGE_AGENT_KEY secret (addresses only, no names)",
+  "pollSeconds": 60,
+  "minEntries": 1,
+  "staticAllow": ["203.0.113.10"],
+  "nftables": {
+    "family": "inet",
+    "table": "edge",
+    "setV4": "players_v4"
+  }
+}

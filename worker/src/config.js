@@ -34,6 +34,14 @@ export function config(env) {
       .map((s) => s.trim().toUpperCase())
       .filter((s) => /^[A-Z]{2}$/.test(s)),
 
+    // Optional IPv4 probe (docs/IPV6.md): an IPv4-only endpoint, not behind Cloudflare, that signs the
+    // address a browser reaches it from. Lets a player whose browser prefers IPv6 still claim their IPv4.
+    ip4Probe: {
+      url: env.IP4_PROBE_URL || '',
+      key: env.IP4_PROBE_KEY || '',
+    },
+    ip4ProbeEnabled: !!(env.IP4_PROBE_URL && env.IP4_PROBE_KEY),
+
     sessionSecret: env.SESSION_SECRET || '',
     sessionTtl: Math.max(300, parseInt(env.SESSION_TTL_SECONDS || '86400', 10) || 86400),
   };

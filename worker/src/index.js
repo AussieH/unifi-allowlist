@@ -113,9 +113,16 @@ async function me(request, env, c) {
 /* ------------------------------------------------------------------- agent */
 
 async function agentState(request, env, c) {
-  if (!authorised(request, env.AGENT_KEY)) return json({ error: 'unauthorized' }, 401);
+  const full = authorised(request, env.AGENT_KEY);
+  // EDGE_AGENT_KEY is for agents on internet-facing hosts: addresses only, no player names.
+  const edge = !full && authorised(request, env.EDGE_AGENT_KEY);
+  if (!full && !edge) return json({ error: 'unauthorized' }, 401);
 
-  const { v4, v6 } = await activeAddresses(env, c);
+  let { v4, v6 } = await activeAddresses(env, c);
+  if (edge) {
+    v4 = v4.map(({ ip, seen }) => ({ ip, seen }));
+    v6 = v6.map(({ ip, seen }) => ({ ip, seen }));
+  }
   return json({ generated_at: nowSec(), ttl_days: c.ttlDays, allow_ipv6: c.allowIpv6, v4, v6 });
 }
 

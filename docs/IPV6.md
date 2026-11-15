@@ -20,6 +20,38 @@ is happening to people and how often.
 
 ## Fixing it properly
 
+### Option 1: the IPv4 probe (recommended)
+
+Run `probe/unifi-allowlist-probe.js` on any small host that has **IPv4 only** and is **not
+behind Cloudflare**: a $4 VPS, or the edge box that already fronts your game server.
+
+1. DNS: add an `A` record, e.g. `ip4.example.com`, pointing at that host. **DNS only** (grey
+   cloud), and **no `AAAA` record**. With no IPv6 address to reach, every browser has to
+   come over IPv4.
+2. On the host: Node 20+, Caddy (or any TLS proxy) using `probe/Caddyfile.example`, and the
+   `probe/unifi-allowlist-probe.service` unit. Config at `/etc/unifi-allowlist/probe.json`:
+
+   ```json
+   { "probeKey": "<openssl rand -base64 32>", "allowedOrigins": ["https://allow.example.com"], "port": 8089 }
+   ```
+
+   The proxy must put the real peer address in `X-Allowlist-Peer`, overwriting anything the
+   client sent. The probe listens on loopback only.
+3. Worker: set `IP4_PROBE_URL = "https://ip4.example.com/v4"` in `wrangler.toml`, then
+   `npx wrangler secret put IP4_PROBE_KEY` with the same key, and deploy.
+
+How it works: the claim page carries a nonce tied to that player. A small script on the page
+asks the probe for a receipt; the probe answers with the IPv4 address the request came from,
+signed with the shared key. The button posts that receipt, and the Worker checks the nonce,
+the signature and the age (10 minutes at most) before recording the IPv4 address. It's the
+same proof as a direct IPv4 visit: you can only get a receipt for an address you're sending
+from. The probe stores nothing.
+
+If the script can't reach the probe, a page loaded over IPv4 still works exactly as before,
+and a page loaded over IPv6 says so instead of saving the wrong address.
+
+### Option 2: turn off IPv6 for the zone
+
 **Turn off IPv6 for the zone.** Cloudflare dashboard → your domain → Network → **IPv6
 Compatibility** → off. Proxied records then answer with A records only, browsers have no
 choice in the matter, and the problem disappears entirely.

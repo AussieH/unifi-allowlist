@@ -25,6 +25,10 @@ TTL_DAYS = "30"
 # Only set true if you also maintain an IPv6 address-group in UniFi (see docs/IPV6.md).
 ALLOW_IPV6 = "false"
 
+# Optional IPv4 probe, so players whose browser prefers IPv6 can still claim their IPv4
+# address (docs/IPV6.md). Set this AND the IP4_PROBE_KEY secret; leave empty to disable.
+IP4_PROBE_URL = ""
+
 # Only serve the pages and the admin API to these countries (ISO 3166-1 two-letter codes,
 # by Cloudflare's geolocation). Empty = everyone. /healthz and the agent feed are never blocked.
 ALLOWED_COUNTRIES = ""
